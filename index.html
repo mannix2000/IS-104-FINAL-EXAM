@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport"
+            content="width=device-width, initial-scale=1.0, user-scalable=no">
+        <title>SAD FINAL EXAM</title>
+        <script
+            src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+        <style>
+        * { user-select: none; -webkit-user-select: none; }
+        input, select, textarea { user-select: text; -webkit-user-select: text; }
+        body { background: #f4f7fc; font-family: 'Segoe UI', Roboto, Arial, sans-serif; margin: 0; padding: 20px; color: #0c1b2f; }
+        .wrap { max-width: 1200px; margin: 0 auto; }
+        header { background: white; border-radius: 24px; padding: 16px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); margin-bottom: 20px; }
+        header h1 { font-size: 1.25rem; margin: 0; }
+        .timer { margin-left: auto; background: #fff0e7; padding: 6px 18px; border-radius: 60px; font-family: monospace; font-weight: 700; font-size: 1.3rem; color: #b45309; }
+        .card { background: white; border-radius: 28px; padding: 24px; margin-bottom: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.03); }
+        .deadline-badge { background: #fef9e3; border-radius: 40px; padding: 6px 14px; font-size: 0.75rem; font-weight: 600; color: #9b6b00; }
+        label { font-weight: 600; display: block; margin-bottom: 6px; }
+        input, select { width: 100%; padding: 10px 14px; border-radius: 16px; border: 1px solid #dce3ec; margin-bottom: 14px; }
+        button { background: #1e2a3e; color: white; border: none; padding: 10px 18px; border-radius: 40px; font-weight: 600; cursor: pointer; margin-right: 10px; margin-bottom: 8px; }
+        button.instructor { background: #6b21a5; }
+        .question { border: 1px solid #e9edf2; border-radius: 20px; padding: 18px; margin-bottom: 16px; background: #ffffff; }
+        .qcase { font-weight: 700; color: #0f5b7a; margin-bottom: 10px; }
+        .badge { background: #e1f0fa; border-radius: 30px; padding: 2px 12px; font-size: 0.7rem; margin-left: 8px; }
+        #submitMsg { display: none; background: #e6f7ec; border-radius: 20px; padding: 14px; margin-top: 20px; color: #117f3a; }
+        .cheat-warning { background: #ffe6e5; color: #b91c1c; padding: 10px; border-radius: 20px; display: none; margin-bottom: 16px; font-weight: 500; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; width: 90%; max-width: 550px; border-radius: 32px; padding: 24px; max-height: 85vh; overflow-y: auto; }
+        .import-area { border: 2px dashed #b9c8e9; border-radius: 20px; padding: 16px; margin: 16px 0; }
+        .flex-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .muted { color: #5c6f87; font-size: 0.8rem; }
+        @media (max-width: 680px) { header h1 { font-size: 1rem; } .timer { font-size: 1rem; } }
+    </style>
+    </head>
+    <body>
+        <div class="wrap">
+            <header>
+                <h1>SAD FINAL EXAM<br><span
+                        style="font-size:0.7rem;"></span></h1>
+                <div class="deadline-badge" id="dynamicDeadlineDisplay">📅
+                    window loading...</div>
+                <div class="timer" id="timer">--:--</div>
+            </header>
+
+            <!-- Access panel -->
+            <div class="card" id="accessCodeSection">
+                <label>🔐 Exam Access Code (instructor provided)</label>
+                <input id="examCodeInput" type="text"
+                    placeholder="Enter access code" />
+                <div class="flex-row">
+                    <button id="examCodeBtn">▶ Start Exam</button>
+                    <button id="instructorSettingsBtn" class="instructor">⚙️
+                        Instructor Panel</button>
+                </div>
+                <p id="codeError" class="muted"
+                    style="color:#b91c1c; display:none;"></p>
+            </div>
+
+            <!-- Student exam form -->
+            <form id="examForm" class="card" autocomplete="off"
+                style="display:none">
+                <div class="cheat-warning" id="cheatWarning">⚠️ Integrity
+                    violation – page will reload</div>
+                <label>📛 Full Name (Last, First)</label>
+                <input id="studentName" type="text"
+                    placeholder="e.g., Garcia, Maria" />
+                <div id="questionsContainer"></div>
+                <div class="flex-row">
+                    <button type="submit" id="submitBtn">✅ Submit Exam</button>
+                    <button type="button" id="downloadMyResultBtn"
+                        class="secondary" disabled>📎 Download my result (JSON)
+                        → send to instructor</button>
+                </div>
+                <div id="submitMsg"></div>
+            </form>
+
+            <!-- Instructor modal with import & master export -->
+            <div id="instructorModal" class="modal">
+                <div class="modal-content">
+                    <h3>🔧 Instructor Configuration</h3>
+                    <label>Admin password to edit settings:</label>
+                    <input type="password" id="instructorAdminPass"
+                        placeholder="admin password" />
+                    <button id="authInstructorBtn">Authenticate</button>
+                    <div id="instructorConfigArea"
+                        style="display:none; margin-top: 20px;">
+                        <label>Student Access Code</label>
+                        <input type="text" id="confAccessCode" />
+                        <label>Exam Start (datetime-local)</label>
+                        <input type="datetime-local" id="confStartDateTime" />
+                        <label>Exam Deadline</label>
+                        <input type="datetime-local" id="confEndDateTime" />
+                        <label>Duration (minutes)</label>
+                        <input type="number" id="confDurationMins" min="10"
+                            max="300" />
+                        <label>Master Export Password (for Excel)</label>
+                        <input type="text" id="confExportPassword" />
+                        <div class="flex-row">
+                            <button id="saveInstructorSettingsBtn">💾 Save
+                                Settings</button>
+                            <button id="closeModalBtn">Cancel</button>
+                        </div>
+                        <hr />
+                        <h4>📥 Import student results (JSON files)</h4>
+                        <div class="import-area">
+                            <input type="file" id="importResultsInput"
+                                accept=".json" multiple />
+                            <button id="importResultsBtn"
+                                style="margin-top: 8px;">Merge selected JSON
+                                files</button>
+                            <p class="muted">Each student can download their
+                                JSON after submitting. Upload here to aggregate
+                                all scores.</p>
+                        </div>
+                        <hr />
+                        <h4>📊 Master export (all aggregated records)</h4>
+                        <button id="masterExportInsideBtn" class="instructor">📥
+                            Export ALL students (alphabetical +
+                            password)</button>
+                        <span class="muted" id="submissionsCounterModal">(0
+                            records)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+(function(){
+    // ---------- FULL QUESTION BANK (50 items) with options ----------
+    const QUESTIONS = [
+        { text: "According to the Standard UI Design Guide, what is the recommended font size for a Main Title?", opts: ["16px", "20px", "24px", "32px"] },
+        { text: "Which flowchart symbol is universally used to represent the start or end of a process?", opts: ["Diamond", "Rectangle", "Oval", "Parallelogram"] },
+        { text: "In a modern UI stack, which of the following is commonly used as a CSS framework?", opts: ["Laravel", "Tailwind CSS", "React", "Vue"] },
+        { text: "What does the Diamond symbol signify in a standard flowchart?", opts: ["Data Input/Output", "A point requiring a yes/no decision", "The end of the process", "A background processing task"] },
+        { text: "According to standard UI status colors, what hex code is used to represent an 'Error' status?", opts: ["#22C55E", "#F59E0B", "#EF4444", "#3B82F6"] },
+        { text: "In a relational database schema, what constraint ensures that a record links to a valid primary key in another table?", opts: ["UNIQUE", "FOREIGN KEY", "AUTO_INCREMENT", "TIMESTAMP"] },
+        { text: "Which of the following is an in-memory caching system used to improve database read performance?", opts: ["bcrypt", "JWT", "Redis", "Nginx"] },
+        { text: "What does XSS stand for in web system security?", opts: ["Cross-Site Scripting", "XML System Security", "Cross-Server Syndication", "X-factor Security Standard"] },
+        { text: "What type of testing focuses on verifying that individual components or modules of software work as intended in isolation?", opts: ["Unit Testing", "Integration Testing", "System Testing", "Acceptance Testing"] },
+        { text: "What testing method is performed without looking at the internal source code or logic of the application?", opts: ["White-box Testing", "Glass-box Testing", "Black-box Testing", "Structural Testing"] },
+        { text: "Which phase of testing is usually performed by the end-users or clients before signing off on the system?", opts: ["Unit Testing", "User Acceptance Testing (UAT)", "Integration Testing", "Stress Testing"] },
+        { text: "What type of testing ensures that new code changes have not broken existing, previously working functionality?", opts: ["Regression Testing", "Alpha Testing", "Performance Testing", "Usability Testing"] },
+        { text: "In software testing, what is a 'Test Case'?", opts: ["A tool used to compile code", "A specific set of inputs, execution conditions, and expected results", "The final report given to the client", "The server where testing takes place"] },
+        { text: "What type of testing involves pushing the system beyond its normal operational capacity to see how it fails?", opts: ["Load Testing", "Stress Testing", "Security Testing", "Beta Testing"] },
+        { text: "Which of the following best defines 'White-box testing'?", opts: ["Testing based on user interface aesthetics", "Testing that requires full knowledge of the internal code and system architecture", "Testing done by customers in a real-world environment", "Testing only the hardware components"] },
+        // PART II 16-30
+        { text: "Why does creating a flowchart help prevent logical errors before coding begins?", opts: ["It automatically writes the backend code.", "It forces the designer to map out every branch and edge case, especially the 'no' paths.", "It determines the exact font sizes needed for the UI.", "It compiles the database schema automatically."] },
+        { text: "In the system authentication flow, what is the primary purpose of a JSON Web Token (JWT)?", opts: ["To hash the user's password in the database", "To act as a secure, temporary key stored in a cookie to keep the user logged in", "To style the dashboard layout", "To prevent Cross-Site Scripting"] },
+        { text: "Why is it recommended to use bcrypt when storing passwords in the database?", opts: ["It encrypts the password so the admin can read it later.", "It hashes the password securely, meaning even if the database is stolen, the passwords cannot be easily reverse-engineered.", "It makes the login process faster.", "It reduces the size of the database."] },
+        { text: "Based on the UI Design Guide, why is consistent button usage and spacing (like an 8px standard gap) important?", opts: ["It makes the code file smaller.", "It creates a scalable, accessible interface that helps modern teams ship faster without sacrificing quality.", "It prevents SQL injection attacks.", "It allows the database to process transactions faster."] },
+        { text: "What is the difference between Vertical Scaling and Horizontal Scaling in system design?", opts: ["Vertical scaling adds more servers; Horizontal scaling upgrades the CPU/RAM of a single server.", "Vertical scaling upgrades the CPU/RAM of a single server; Horizontal scaling adds more server instances behind a load balancer.", "Vertical scaling changes the UI layout; Horizontal scaling changes the database.", "There is no difference."] },
+        { text: "In a CRUD application, why must 'Authorization' check the user_id on every operation?", opts: ["To ensure the user has paid their subscription fee.", "To count how many users are currently online.", "Because the client input cannot be trusted; the server must verify the user actually owns the resource they are trying to edit or delete.", "To load the CSS stylesheets faster."] },
+        { text: "What is the primary function of a Sequence Diagram in system design?", opts: ["To show the exact colors used on a webpage.", "To document the step-by-step flow of messages and actions between the user, frontend, backend, and database.", "To test the system for bugs automatically.", "To display the physical server rack layout."] },
+        { text: "Why is Integration Testing a critical step after Unit Testing?", opts: ["Because unit tests only check the UI.", "Because individual modules might work perfectly alone, but fail when they attempt to share data or communicate with each other.", "Because clients only care about integration tests.", "Because it replaces the need for a database."] },
+        { text: "In quality assurance, what is the core difference between 'Verification' and 'Validation'?", opts: ["Verification asks 'Are we building the product right?'; Validation asks 'Are we building the right product?'", "Verification is done by users; Validation is done by computers.", "Verification is black-box; Validation is white-box.", "They are exactly the same concept."] },
+        { text: "Why is 'Beta Testing' usually performed in a real-world environment by actual end-users?", opts: ["Because developers don't have time to test.", "To catch unexpected user behaviors, hardware variations, and edge cases that internal QA teams could not simulate.", "Because it costs less to have users fix the code.", "To generate marketing materials."] },
+        { text: "Why do software development teams write 'Test Plans' before testing begins?", opts: ["To delay the project timeline.", "To document the scope, approach, resources, and schedule of the testing activities, ensuring all requirements are covered.", "To write the actual application code.", "To design the database schema."] },
+        { text: "Explain the purpose of 'Boundary Value Analysis' in testing.", opts: ["Testing the user interface colors.", "Focusing test cases on the extreme edges of input ranges (e.g., maximum and minimum values) because errors are most common there.", "Testing the firewall boundaries.", "Analyzing the geographic boundaries of the network."] },
+        { text: "Why should a staging/test environment closely mirror the live production environment?", opts: ["So developers can play games on it.", "To ensure that tests run in staging will accurately reflect how the software will behave when launched to real users.", "To confuse the end-users.", "It shouldn't; staging should be completely different from production."] },
+        { text: "What is the primary goal of 'Usability Testing'?", opts: ["To see how much RAM the system uses.", "To evaluate how easy and intuitive the system is for a human to navigate and use.", "To find database SQL injections.", "To check if the source code is well-commented."] },
+        { text: "How does automated testing improve the software development lifecycle?", opts: ["It replaces the need for software developers.", "It allows repetitive test cases (like regression tests) to be executed quickly and frequently without human error.", "It automatically fixes bugs in the code.", "It writes the UI Design Guide automatically."] },
+        // PART III 31-40
+        { text: "Analyze the following scenario: A flowchart has a Decision diamond asking 'Is password correct?'. It has an arrow pointing to 'Login Success' for YES, but no arrow for NO. What is the impact of this design flaw?", opts: ["The system will run faster.", "Developers will not know what the system should do if the password fails, leading to missing logic or application crashes.", "The UI will change to the color red.", "The database will automatically delete the user."] },
+        { text: "According to the System Design document, analyze the difference in mitigating XSS versus CSRF.", opts: ["Both are mitigated by using HTTPS.", "XSS is mitigated by escaping user input in HTML; CSRF is mitigated by using SameSite=Lax cookies or anti-CSRF tokens.", "XSS requires a load balancer; CSRF requires Redis.", "There is no difference; they are the same vulnerability."] },
+        { text: "Examine the provided SQL schema: FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE. What will happen to a user's posts if their account is deleted from the users table?", opts: ["The posts will remain in the database forever.", "The database will crash.", "All posts associated with that user_id will be automatically deleted to maintain referential integrity.", "The posts will be transferred to an admin account."] },
+        { text: "Analyze the UI spacing guidelines. If a designer uses a 4px gap between a text label and a text input, and a 32px gap between entirely different form sections, what UI principle are they applying?", opts: ["Visual hierarchy and grouping (items close together are related).", "Random spacing generation.", "Database normalization.", "Encryption standards."] },
+        { text: "Review the Sequence Diagram flow for a new post: POST /api/posts -> DB insert -> Refresh list. If the system is horizontally scaled with multiple servers, why might 'Refresh list' immediately fail to show the new post?", opts: ["Because the font size is too small.", "Because of caching delays or database replication lag between the primary and secondary databases.", "Because the user logged out.", "Because the flowchart was drawn incorrectly."] },
+        { text: "Analyze a defect report that simply states: 'The login button doesn't work.' Why is this a poor defect report for a developer?", opts: ["It doesn't contain a flowchart.", "It lacks 'steps to reproduce,' expected behavior, actual behavior, and environment details (browser/OS).", "It is not written in code.", "It uses the wrong UI colors."] },
+        { text: "If an application requires a user to be exactly 18 to 65 years old, which set of test data represents the best Boundary Value Analysis?", opts: ["25, 30, 40", "17, 18, 65, 66", "0, 100, 1000", "A, B, C"] },
+        { text: "During testing, Module A works perfectly, and Module B works perfectly. However, when Module A tries to send data to Module B, the system crashes. What type of failure is this?", opts: ["Unit Testing failure", "Integration failure", "Usability failure", "Hardware failure"] },
+        { text: "Analyze this situation: An e-commerce site works flawlessly with 100 users. On Black Friday, with 10,000 users, the site crashes. What QA activity was neglected during the SDLC?", opts: ["White-box Testing", "Load/Stress Testing", "UI/UX Testing", "Unit Testing"] },
+        { text: "A system passes all technical Unit and Integration tests, but the client rejects it during UAT because it doesn't generate the specific accounting report they need. What is the root cause?", opts: ["The developers wrote bad code.", "The servers are too slow.", "There was a failure in gathering or understanding the initial business requirements.", "The UI used the wrong shade of blue."] },
+        // PART IV 41-50
+        { text: "You are designing a form based on the Standard UI Guide. A user successfully updates their profile. Which hex color code should you apply to the success notification banner?", opts: ["#EF4444", "#F59E0B", "#3B82F6", "#22C55E"] },
+        { text: "You are drawing a flowchart for a system that calculates grades. You need a step where the system asks the user to 'Enter Prelim Grade'. Which flowchart symbol must you apply here?", opts: ["Oval", "Rectangle", "Parallelogram", "Diamond"] },
+        { text: "Apply your knowledge of System Design. You are building an API that allows users to delete their own comments. How should the backend verify the request to prevent malicious deletions?", opts: ["Trust the comment_id sent by the frontend and delete it.", "Extract the user_id securely from the JWT token and verify the comment actually belongs to that user before executing the DELETE command.", "Ask the user for their password again.", "Check the UI color of the delete button."] },
+        { text: "You are tasked with making the web application secure from interception on public Wi-Fi. What architectural standard must you apply?", opts: ["Enforce HTTPS on all endpoints using an SSL/TLS certificate.", "Use a larger font size.", "Change the database to Redis.", "Use vertical scaling."] },
+        { text: "If you are developing a 'Modern SPA' (Single Page Application) as recommended in your system design guide, which frontend tech stack should you choose to apply?", opts: ["HTML + vanilla JS", "React + React Router + Tailwind", "PHP + jQuery", "C++ and Assembly"] },
+        { text: "Apply black-box testing techniques to a password field that requires 'at least 8 characters'. Which of the following inputs is the most effective negative test case?", opts: ["password123", "admin", "MySuperSecretPassword", "12345678"] },
+        { text: "You are writing a test case for a 'Logout' function. What is the most critical 'Expected Result' you must apply to the test case?", opts: ["The screen turns blue.", "The user's JWT/session token is cleared and they are redirected to the /login page.", "The database is deleted.", "The computer restarts."] },
+        { text: "A developer just fixed a bug where the shopping cart calculated tax incorrectly. What testing action must you apply immediately after the fix?", opts: ["Alpha Testing", "Regression Testing (to ensure fixing the tax didn't break the total sum or checkout process).", "Stress testing", "Penetration testing"] },
+        { text: "You need to ensure a new distributed internet system can handle an expected spike in traffic. What testing method will you apply using automated bots?", opts: ["Unit testing the login button.", "Load testing by simulating 5,000 concurrent virtual users hitting the server simultaneously.", "UAT with the CEO.", "Boundary value analysis on the age field."] },
+        { text: "Apply the concept of White-box testing. As a QA engineer, how would you test a newly written tax calculation function?", opts: ["By clicking the UI checkout button repeatedly.", "By reading the internal Python/Java source code of the function, checking the logic, and writing code scripts to test the specific math algorithms.", "By asking the customer if they like the feature.", "By unplugging the server."] }
+    ];
+    // Answer key (50 answers) according to provided answer key
+    const CORRECT_ANSWERS = [
+        "D","C","B","B","C","B","C","A","A","C","B","A","B","B","B", // 1-15
+        "B","B","B","B","B","C","B","B","A","B","B","B","B","B","B", // 16-30
+        "B","B","C","A","B","B","B","B","B","C", // 31-40 (31B,32B,33C,34A,35B,36B,37B,38B,39B,40C)
+        "D","C","B","A","B","B","B","B","B","B"  // 41-50 (41D,42C,43B,44A,45B,46B,47B,48B,49B,50B)
+    ];
+
+    // ---------- Instructor settings defaults ----------
+    const DEFAULT_SETTINGS = {
+        studentAccessCode: "DEV-EXAM-2026",
+        examStart: "2026-05-20T08:00",
+        examDeadline: "2026-06-20T23:59",
+        durationMinutes: 90,
+        instructorMasterPassword: "TEST_MASTER"
+    };
+    const ADMIN_MASTER_PASS = "InstAdmin2026!";
+    const SETTINGS_KEY = "UIUX_ExamSettings";
+    const SUBMISSIONS_KEY = "UIUX_Submissions";
+
+    // ----- helper functions -----
+    function loadSettings() { const s = localStorage.getItem(SETTINGS_KEY); return s ? JSON.parse(s) : {...DEFAULT_SETTINGS}; }
+    function saveSettings(settings) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+    function loadSubmissions() { const s = localStorage.getItem(SUBMISSIONS_KEY); return s ? JSON.parse(s) : []; }
+    function saveSubmissions(subs) { localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(subs)); updateCounter(); }
+    function updateCounter() { let c = loadSubmissions().length; if(submissionsCounterModal) submissionsCounterModal.innerText = `📋 ${c} record(s) stored`; }
+    function addSubmissionRecord(record) { let subs = loadSubmissions(); subs.push(record); saveSubmissions(subs); }
+
+    // build HTML for questions (randomize later)
+    let questionsContainer = document.getElementById('questionsContainer');
+    function buildQuestionsHTML() {
+        let html = '';
+        QUESTIONS.forEach((q, idx) => {
+            let partTag = idx<15 ? 'REMEMBERING' : (idx<30 ? 'UNDERSTANDING' : (idx<40 ? 'ANALYZING' : 'APPLYING'));
+            html += `<div class="question" data-qid="${idx+1}">
+                        <div class="qcase">📌 Q${idx+1} <span class="badge">${partTag}</span></div>
+                        <label>${q.text}</label>
+                        <select name="temp">
+                            <option value="">-- Select answer --</option>
+                            <option value="A">A. ${q.opts[0]}</option>
+                            <option value="B">B. ${q.opts[1]}</option>
+                            <option value="C">C. ${q.opts[2]}</option>
+                            <option value="D">D. ${q.opts[3]}</option>
+                        </select>
+                    </div>`;
+        });
+        return html;
+    }
+    function shuffleArray(arr) { for (let i=arr.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+    let currentCorrectMap = [];
+    function randomizeQuestionsAndOptions() {
+        let blocks = Array.from(questionsContainer.querySelectorAll('.question'));
+        let shuffled = shuffleArray(blocks);
+        let newCorrect = [];
+        questionsContainer.innerHTML = '';
+        shuffled.forEach((block, idx) => {
+            let qid = parseInt(block.getAttribute('data-qid'), 10);
+            newCorrect[idx] = CORRECT_ANSWERS[qid-1];
+            let select = block.querySelector('select');
+            if(select){
+                let placeholder = Array.from(select.options).find(o=>o.value==="");
+                let opts = Array.from(select.options).filter(o=>o.value!=="");
+                shuffleArray(opts);
+                select.innerHTML = "";
+                if(placeholder) select.appendChild(placeholder);
+                opts.forEach(opt=>select.appendChild(opt));
+                select.name = `q${idx+1}`;
+            }
+            questionsContainer.appendChild(block);
+        });
+        currentCorrectMap = newCorrect;
+    }
+
+    // Exam state
+    let examStarted = false, timerInterval = null, totalSecondsLeft = 0, studentSubmissionRecorded = false, currentResultForDownload = null;
+    function updateTimerDisplay() { let m=Math.floor(totalSecondsLeft/60), s=totalSecondsLeft%60; document.getElementById('timer').innerText = `${m<10?'0'+m:m}:${s<10?'0'+s:s}`; }
+    function startTimer(sec) { if(timerInterval) clearInterval(timerInterval); totalSecondsLeft=sec; updateTimerDisplay(); timerInterval = setInterval(()=>{ if(!examStarted) return; if(totalSecondsLeft<=0){ clearInterval(timerInterval); submitExam(true); } else { totalSecondsLeft--; updateTimerDisplay(); } },1000); }
+    function lockAndSubmit() { if(examStarted && !studentSubmissionRecorded) submitExam(false); }
+    function submitExam(isTimeout) {
+        if(studentSubmissionRecorded) return;
+        clearInterval(timerInterval);
+        examStarted = false;
+        let name = document.getElementById('studentName').value.trim();
+        if(!name){ alert("Please enter your full name."); return; }
+        let correctCount = 0;
+        for(let i=1; i<=currentCorrectMap.length; i++){
+            let sel = document.querySelector(`select[name="q${i}"]`);
+            if(sel && sel.value === currentCorrectMap[i-1]) correctCount++;
+        }
+        let percent = Math.round((correctCount/50)*100);
+        let passed = percent >= 60;
+        let record = { studentName: name, rawScore: correctCount, totalQuestions: 50, percent, passed, timestamp: new Date().toLocaleString() };
+        currentResultForDownload = record;
+        addSubmissionRecord(record);
+        studentSubmissionRecorded = true;
+        let msgDiv = document.getElementById('submitMsg');
+        msgDiv.style.display = 'block';
+        msgDiv.innerHTML = `✅ Submitted. Score: ${correctCount}/50 (${percent}%) — ${passed ? 'PASS' : 'FAIL'}. Download your JSON result and send it to your instructor.`;
+        document.getElementById('downloadMyResultBtn').disabled = false;
+        document.querySelectorAll('#examForm select, #examForm input, #submitBtn').forEach(el=>el.disabled=true);
+    }
+    document.getElementById('downloadMyResultBtn').onclick = () => {
+        if(!currentResultForDownload) return;
+        let dataStr = JSON.stringify(currentResultForDownload, null, 2);
+        let blob = new Blob([dataStr], {type:"application/json"});
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = `${currentResultForDownload.studentName.replace(/\s/g,'_')}_exam_result.json`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 200);
+    };
+
+    // Anti-cheat lockdown
+    function resetDueToCheat(reason) {
+        if(!examStarted || studentSubmissionRecorded) return;
+        let warn = document.getElementById('cheatWarning');
+        if(warn) { warn.style.display='block'; warn.innerText=`⚠️ ${reason}. Reloading...`; }
+        if(timerInterval) clearInterval(timerInterval);
+        examStarted = false;
+        setTimeout(()=>location.reload(),1500);
+    }
+    function activateLockdown() {
+        document.addEventListener('copy', e=>{ if(examStarted){ e.preventDefault(); resetDueToCheat('Copy attempt'); } });
+        document.addEventListener('cut', e=>{ if(examStarted){ e.preventDefault(); resetDueToCheat('Cut attempt'); } });
+        document.addEventListener('paste', e=>{ if(examStarted){ e.preventDefault(); resetDueToCheat('Paste attempt'); } });
+        document.addEventListener('contextmenu', e=>{ if(examStarted){ e.preventDefault(); resetDueToCheat('Right-click'); } });
+        document.addEventListener('selectstart', e=>{ if(examStarted){ e.preventDefault(); resetDueToCheat('Selection'); } });
+        window.addEventListener('keydown', e=>{
+            if(!examStarted) return;
+            if(e.key==='F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) || (e.ctrlKey && ['u','s','p','a','c','x'].includes(e.key)) || (e.metaKey && ['c','x','v'].includes(e.key))) {
+                e.preventDefault(); resetDueToCheat('Shortcut');
+            }
+        });
+        window.addEventListener('blur', ()=>{ if(examStarted && !studentSubmissionRecorded) resetDueToCheat('Window lost focus'); });
+        document.addEventListener('visibilitychange', ()=>{ if(document.hidden && examStarted && !studentSubmissionRecorded) resetDueToCheat('Tab switch'); });
+    }
+
+    // Exam start logic
+    document.getElementById('examCodeBtn').onclick = () => {
+        let settings = loadSettings();
+        if(document.getElementById('examCodeInput').value.trim() !== settings.studentAccessCode){
+            document.getElementById('codeError').style.display='block'; document.getElementById('codeError').innerText='❌ Invalid access code.';
+            return;
+        }
+        let now = new Date();
+        let start = new Date(settings.examStart), end = new Date(settings.examDeadline);
+        if(now < start || now > end){ document.getElementById('codeError').style.display='block'; document.getElementById('codeError').innerText='⛔ Exam not available now.'; return; }
+        document.getElementById('codeError').style.display='none';
+        document.getElementById('accessCodeSection').style.display='none';
+        document.getElementById('examForm').style.display='block';
+        examStarted = true;
+        studentSubmissionRecorded = false;
+        randomizeQuestionsAndOptions();
+        let durationSec = settings.durationMinutes * 60;
+        let secUntilDeadline = Math.max(0, Math.floor((end - now)/1000));
+        let initialSecs = Math.min(durationSec, secUntilDeadline);
+        if(initialSecs <= 0){ alert("Deadline exceeded"); location.reload(); return; }
+        startTimer(initialSecs);
+        activateLockdown();
+    };
+
+    // Instructor modal
+    let modal = document.getElementById('instructorModal');
+    document.getElementById('instructorSettingsBtn').onclick = ()=>{ modal.style.display='flex'; document.getElementById('instructorConfigArea').style.display='none'; document.getElementById('instructorAdminPass').value=''; updateCounter(); };
+    document.getElementById('closeModalBtn').onclick = ()=> modal.style.display='none';
+    document.getElementById('authInstructorBtn').onclick = ()=>{
+        if(document.getElementById('instructorAdminPass').value === ADMIN_MASTER_PASS){
+            let s = loadSettings();
+            document.getElementById('confAccessCode').value = s.studentAccessCode;
+            document.getElementById('confStartDateTime').value = s.examStart;
+            document.getElementById('confEndDateTime').value = s.examDeadline;
+            document.getElementById('confDurationMins').value = s.durationMinutes;
+            document.getElementById('confExportPassword').value = s.instructorMasterPassword;
+            document.getElementById('instructorConfigArea').style.display = 'block';
+        } else alert("Invalid admin password.");
+    };
+    document.getElementById('saveInstructorSettingsBtn').onclick = ()=>{
+        let newSet = {
+            studentAccessCode: document.getElementById('confAccessCode').value.trim(),
+            examStart: document.getElementById('confStartDateTime').value,
+            examDeadline: document.getElementById('confEndDateTime').value,
+            durationMinutes: parseInt(document.getElementById('confDurationMins').value,10),
+            instructorMasterPassword: document.getElementById('confExportPassword').value.trim()
+        };
+        saveSettings(newSet);
+        document.getElementById('dynamicDeadlineDisplay').innerHTML = `📅 Start: ${new Date(newSet.examStart).toLocaleString()} | Deadline: ${new Date(newSet.examDeadline).toLocaleString()}`;
+        modal.style.display='none';
+        alert("Settings saved.");
+    };
+    // Import JSON files
+    document.getElementById('importResultsBtn').onclick = () => {
+        let files = document.getElementById('importResultsInput').files;
+        if(!files.length){ alert("Select JSON files."); return; }
+        let imported=0;
+        for(let file of files){
+            let reader = new FileReader();
+            reader.onload = (e) => {
+                try{
+                    let rec = JSON.parse(e.target.result);
+                    if(rec.studentName && typeof rec.rawScore === 'number'){
+                        addSubmissionRecord(rec);
+                        imported++;
+                    } else console.warn("invalid");
+                }catch(err){ alert(`Error in ${file.name}`); }
+                if(imported === files.length) alert(`Imported ${imported} records.`);
+            };
+            reader.readAsText(file);
+        }
+        setTimeout(()=>updateCounter(), 500);
+    };
+    // Master export
+    document.getElementById('masterExportInsideBtn').onclick = () => {
+        let settings = loadSettings();
+        let pwd = prompt("🔐 Instructor Master Password:");
+        if(pwd !== settings.instructorMasterPassword){ alert("Wrong password."); return; }
+        let subs = loadSubmissions();
+        if(!subs.length){ alert("No submissions (import or local)."); return; }
+        let sorted = [...subs].sort((a,b)=>a.studentName.localeCompare(b.studentName));
+        let rows = [["MASTER REPORT - UI/UX & TESTING EXAM"],[],["Student Name","Score","Total","Percent","Result","Timestamp"]];
+        sorted.forEach(s=>rows.push([s.studentName, s.rawScore, s.totalQuestions, `${s.percent}%`, s.passed?"PASS":"FAIL", s.timestamp]));
+        let ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = [{wch:28},{wch:10},{wch:8},{wch:12},{wch:10},{wch:22}];
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "All_Students");
+        XLSX.writeFile(wb, `UIUX_Exam_All_${new Date().toISOString().slice(0,19)}.xlsx`);
+    };
+    document.getElementById('examForm').addEventListener('submit', (e)=>{ e.preventDefault(); if(!studentSubmissionRecorded) submitExam(false); });
+
+    // Init UI
+    questionsContainer.innerHTML = buildQuestionsHTML();
+    updateCounter();
+    let settings = loadSettings();
+    document.getElementById('dynamicDeadlineDisplay').innerHTML = `📅 Start: ${new Date(settings.examStart).toLocaleString()} | Deadline: ${new Date(settings.examDeadline).toLocaleString()}`;
+})();
+</script>
+    </body>
+</html>
